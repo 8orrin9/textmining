@@ -14,7 +14,6 @@ rcParams['axes.unicode_minus'] = False
 
 fname_comments = 'data/suicide_comments.xlsx'
 fname_scores   = 'data/suicide_scores.pkl'
-fname_result   = 'data/suicide_result.xlsx'
 fname_result2   = 'data/suicide_result2.xlsx'
 
 
