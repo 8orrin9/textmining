@@ -1,0 +1,297 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+
+
+
+df_abcd = pd.read_excel('./re_keyword.xlsx', header=[0])
+
+df_abcd_m = df_abcd.melt()
+df_abcd_m.dropna(axis=0, subset=['value'], how='any', inplace=True)
+
+
+
+df_abcd_lst = df_abcd.columns.to_list()
+
+
+
+df_crawled_graphic = pd.read_excel('./re_original data.xlsx', sheet_name='graphic')
+df_crawled_industry = pd.read_excel('./re_original data.xlsx', sheet_name='industry')
+df_crawled_ux = pd.read_excel('./re_original data.xlsx', sheet_name='ux')
+df_crawled_fashion = pd.read_excel('./re_original data.xlsx', sheet_name='fashion')
+
+
+
+df_crawled_graphic['contents'] = df_crawled_graphic['contents'].fillna(' ')
+df_crawled_industry['contents'] = df_crawled_industry['contents'].fillna(' ')
+df_crawled_ux['contents'] = df_crawled_ux['contents'].fillna(' ')
+df_crawled_fashion['contents'] = df_crawled_fashion['contents'].fillna(' ')
+
+df_crawled_graphic['contents'] = df_crawled_graphic['contents'].str.replace(r'[^a-zA-Z]',' ', regex=True)
+df_crawled_industry['contents'] = df_crawled_industry['contents'].str.replace(r'[^a-zA-Z]',' ', regex=True)
+df_crawled_ux['contents'] = df_crawled_ux['contents'].str.replace(r'[^a-zA-Z]',' ', regex=True)
+df_crawled_fashion['contents'] = df_crawled_fashion['contents'].str.replace(r'[^a-zA-Z]',' ', regex=True)
+
+df_crawled_graphic['contents'] = df_crawled_graphic['contents'].str.lower()
+df_crawled_industry['contents'] = df_crawled_industry['contents'].str.lower()
+df_crawled_ux['contents'] = df_crawled_ux['contents'].str.lower()
+df_crawled_fashion['contents'] = df_crawled_fashion['contents'].str.lower()
+
+df_crawled_graphic['contents'] = df_crawled_graphic['contents'].str.replace("'", '')
+df_crawled_industry['contents'] = df_crawled_industry['contents'].str.replace("'", '')
+df_crawled_ux['contents'] = df_crawled_ux['contents'].str.replace("'", '')
+df_crawled_fashion['contents'] = df_crawled_fashion['contents'].str.replace("'", '')
+
+
+
+df_crawled_graphic.reset_index(inplace=True)
+df_crawled_industry.reset_index(inplace=True)
+df_crawled_ux.reset_index(inplace=True)
+df_crawled_fashion.reset_index(inplace=True)
+
+df_crawled_graphic.rename(columns={'index': 'ID'}, inplace=True)
+df_crawled_industry.rename(columns={'index': 'ID'}, inplace=True)
+df_crawled_ux.rename(columns={'index': 'ID'}, inplace=True)
+df_crawled_fashion.rename(columns={'index': 'ID'}, inplace=True)
+
+
+
+def gen_document(ID, word_lst):
+    df_tmp = pd.DataFrame(
+        {
+            'ID'       : ID,
+            'sentence' : word_lst
+        }
+    )
+    return df_tmp
+
+def gen_DataFrame(df):
+    df_res = pd.DataFrame()
+    for i, row in enumerate(df.itertuples()):
+        word_lst = row.contents.split()
+        df_doc = gen_document(row.ID, word_lst)
+        df_res = pd.concat([df_res, df_doc])
+    df_res.reset_index(inplace=True)
+    df_res.drop('index', axis=1, inplace=True)
+    
+    return df_res
+
+df_crawled_graphic_k = gen_DataFrame(df_crawled_graphic)
+df_crawled_industry_k = gen_DataFrame(df_crawled_industry)
+df_crawled_ux_k = gen_DataFrame(df_crawled_ux)
+df_crawled_fashion_k = gen_DataFrame(df_crawled_fashion)
+
+
+
+def get_frequency(df_con):
+    sentences1 = df_con['sentence'].tolist()
+    sentences2 = df_abcd_m['value'].tolist()
+    ar_freq = np.zeros((len(sentences1), len(sentences2)))
+    for i in range(ar_freq.shape[0]):
+        for j in range(ar_freq.shape[1]):
+            if sentences1[i] == sentences2[j]:
+                ar_freq[i, j] = 1.0
+    return ar_freq
+
+%%time
+freq_array_graphic = get_frequency(df_crawled_graphic_k)
+freq_array_industry = get_frequency(df_crawled_industry_k)
+freq_array_ux = get_frequency(df_crawled_ux_k)
+freq_array_fashion = get_frequency(df_crawled_fashion_k)
+
+
+
+freq_array_graphic.shape
+freq_array_industry.shape
+freq_array_ux.shape
+freq_array_fashion.shape
+
+
+
+sr_abcd = df_abcd.count()
+
+
+
+def set_score(freq_array, df_con):
+    sr_abcd = df_abcd.count()
+    for key in sr_abcd.index:
+        df_con[key] = 0.0
+    for idx in df_con.index:
+        off_b = 0
+        off_e = 0
+        for key in sr_abcd.index:
+            off_b = off_e
+            off_e += sr_abcd[key]
+            df_con.loc[idx, key] = freq_array[idx][off_b:off_e].sum()
+        if idx % 1000 == 0:
+            print('<cnt:{}, idx:{}> ======================'.format(idx//1000,idx))
+    print(' === End of job === ')
+    return df_con
+
+%%time
+df_crawled_graphic_k = set_score(freq_array_graphic, df_crawled_graphic_k)
+
+%%time
+df_crawled_industry_k = set_score(freq_array_industry, df_crawled_industry_k)
+
+%%time
+df_crawled_ux_k = set_score(freq_array_ux, df_crawled_ux_k)
+
+%%time
+df_crawled_fashion_k = set_score(freq_array_fashion, df_crawled_fashion_k)
+
+
+
+df_crawled_graphic_k.to_pickle('./freq_result_graphic')
+df_crawled_industry_k.to_pickle('./freq_result_industry')
+df_crawled_ux_k.to_pickle('./freq_result_ux')
+df_crawled_fashion_k.to_pickle('./freq_result_fashion')
+
+
+
+df_score_graphic = pd.concat([df_crawled_graphic.set_index('ID'), df_crawled_graphic_k[['ID'] + df_abcd_lst].groupby('ID').sum()], axis=1).reset_index()
+df_score_industry = pd.concat([df_crawled_industry.set_index('ID'), df_crawled_industry_k[['ID'] + df_abcd_lst].groupby('ID').sum()], axis=1).reset_index()
+df_score_ux = pd.concat([df_crawled_ux.set_index('ID'), df_crawled_ux_k[['ID'] + df_abcd_lst].groupby('ID').sum()], axis=1).reset_index()
+df_score_fashion = pd.concat([df_crawled_fashion.set_index('ID'), df_crawled_fashion_k[['ID'] + df_abcd_lst].groupby('ID').sum()], axis=1).reset_index()
+
+
+
+df_score_graphic = df_score_graphic.fillna(0)
+df_score_industry = df_score_industry.fillna(0)
+df_score_ux = df_score_ux.fillna(0)
+df_score_fashion = df_score_fashion.fillna(0)
+
+
+
+df_score_graphic.to_csv('result_graphic.csv')
+df_score_industry.to_csv('result_industry.csv')
+df_score_ux.to_csv('result_ux.csv')
+df_score_fashion.to_csv('result_fashion.csv')
+
+
+
+df_total_graphic = pd.DataFrame(columns=['Column_1', 'Column_2', 'Column_3', 'Column_4', 'Column_5'])
+
+for i in range(2, 7):
+    total_value = df_score_graphic.iloc[:,i].sum()
+    df_total_graphic[f'Column_{i-1}'] = [total_value]
+    
+df_total_graphic = df_total_graphic.copy()
+df_total_graphic.rename(columns={'Column_1': 'Research', 'Column_2': 'Ideation', 'Column_3': 'Mock-up', 'Column_4': 'Production', 'Column_5': 'Evaluation'}, inplace=True)
+
+
+    
+df_total_industry = pd.DataFrame(columns=['Column_1', 'Column_2', 'Column_3', 'Column_4', 'Column_5'])
+
+for i in range(2, 7):
+    total_value = df_score_industry.iloc[:,i].sum()
+    df_total_industry[f'Column_{i-1}'] = [total_value]
+
+df_total_industry = df_total_industry.copy()
+df_total_industry.rename(columns={'Column_1': 'Research', 'Column_2': 'Ideation', 'Column_3': 'Mock-up', 'Column_4': 'Production', 'Column_5': 'Evaluation'}, inplace=True)
+    
+    
+df_total_ux = pd.DataFrame(columns=['Column_1', 'Column_2', 'Column_3', 'Column_4', 'Column_5'])
+
+for i in range(2, 7):
+    total_value = df_score_ux.iloc[:,i].sum()
+    df_total_ux[f'Column_{i-1}'] = [total_value]
+    
+df_total_ux = df_total_ux.copy()
+df_total_ux.rename(columns={'Column_1': 'Research', 'Column_2': 'Ideation', 'Column_3': 'Mock-up', 'Column_4': 'Production', 'Column_5': 'Evaluation'}, inplace=True)
+
+    
+df_total_fashion = pd.DataFrame(columns=['Column_1', 'Column_2', 'Column_3', 'Column_4', 'Column_5'])
+
+for i in range(2, 7):
+    total_value = df_score_fashion.iloc[:,i].sum()
+    df_total_fashion[f'Column_{i-1}'] = [total_value]
+    
+df_total_fashion = df_total_fashion.copy()
+df_total_fashion.rename(columns={'Column_1': 'Research', 'Column_2': 'Ideation', 'Column_3': 'Mock-up', 'Column_4': 'Production', 'Column_5': 'Evaluation'}, inplace=True)
+
+
+
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+plt.rc('figure', figsize=(12, 8))
+
+from matplotlib import rcParams
+rcParams['font.family'] = 'Gulim'
+rcParams['font.size'] = 10
+rcParams['axes.unicode_minus'] = False
+
+
+
+df_total_graphic
+df_total_industry
+df_total_ux
+df_total_fashion
+
+
+
+total = pd.concat([df_total_graphic,df_total_industry,df_total_ux,df_total_fashion], join='outer', axis=0, ignore_index=True)
+total.index = ['graphic', 'industry', 'ux', 'fashion']
+
+
+
+total_transposed = total.transpose()
+total_transposed
+
+total_transposed.rename(columns={0: 'graphic', 1: 'industry', 2: 'ux', 3: 'fashion'}, inplace=True)
+
+
+
+from matplotlib import rcParams
+rcParams['font.size'] = 18
+plt.rc('figure', figsize=(20, 8))
+rcParams['axes.unicode_minus'] = False
+
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+plt.rc('figure', figsize=(12, 8))
+
+from matplotlib import rcParams
+rcParams['font.family'] = 'Gulim'
+rcParams['font.size'] = 10
+rcParams['axes.unicode_minus'] = False
+
+
+
+total.plot(kind='bar', rot=0)
+plt.grid(True, alpha=0.4, zorder=0)
+plt.title("빈도수분석_디자인 영역별")
+plt.legend(loc='upper left')
+plt.show()
+
+
+
+total_ratio = total.div(total.sum(), axis=1)
+total_ratio_transposed = total_ratio.transpose()
+
+total_ratio_transposed.plot(kind='bar', rot=0)
+plt.grid(True, alpha=0.4, zorder=0)
+plt.title("빈도수분석_디자인 단계별_비율화")
+plt.legend(loc='upper left')
+plt.show()
+
+total_transposed.plot(kind='bar', rot=0)
+plt.grid(True, alpha=0.4, zorder=0)
+plt.title("빈도수분석_디자인 단계별")
+plt.legend(loc='upper left')
+plt.show()
+
+
+
+total_transposed_ratio = total_transposed.div(total_transposed.sum(), axis=1)
+total_transposed_ratio_transposed = total_transposed_ratio.transpose()
+
+total_transposed_ratio_transposed.plot(kind='bar', rot=0)
+plt.grid(True, alpha=0.4, zorder=0)
+plt.title("빈도수분석_디자인 영역별_비율화")
+plt.legend(loc='upper left')
+plt.show()
