@@ -1,0 +1,54 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+plt.style.use('seaborn-v0_8-darkgrid')
+plt.rc('figure', figsize=(12, 8))
+from matplotlib import rcParams
+rcParams['font.size'] = 10
+rcParams['font.family'] = 'New Gulim'
+rcParams['axes.unicode_minus'] = False
+
+fname_scores   = 'data/suicide_scores.pkl'
+fname_result   = 'data/suicide_result.xlsx'
+fname_result2   = 'data/suicide_result2.xlsx'
+
+cat_lst = ['자녀미숙', '경제_가정불화']
+sen_lst = ['불쌍함/연민', '아껴주는', '슬픔', '불안/걱정', '힘듦/지침', '안타까움/실망', '기대감',
+           '안심/신뢰', '서러움', '깨달음', '환영/호의', '고마움', '절망', '비장함', '편안/쾌적', '행복',
+           '패배/자기혐오', '당황/난처', '신기함/관심', '기쁨', '죄책감', '감동/감탄', '부담/안_내킴', '뿌듯함',
+           '존경', '없음', '흐뭇함(귀여움/예쁨)', '지긋지긋', '놀람', '공포/무서움', '귀찮음', '부끄러움', '한심함',
+           '즐거움/신남', '불평/불만', '의심/불신', '짜증', '우쭐댐/무시함', '화남/분노', '재미없음', '어이없음',
+           '경악', '증오/혐오', '역겨움/징그러움']
+col_lst = ['안타까움/실망', '슬픔', '불쌍함/연민', '화남/분노', '불안/걱정', '불평/불만',
+           '짜증', '증오/혐오', '절망', '한심함', '어이없음', '의심/불신', '경악',
+           '힘듦/지침', '아껴주는', '안심/신뢰', '기대감', '존경', '감동/감탄']
+
+df_s = pd.read_pickle(fname_scores)
+df_t = df_s.drop('comments', axis=1)
+
+MAX = df_t[sen_lst].max().max()
+MIN = df_t[sen_lst].min().min()
+def func_n(x):
+    return round((x - MIN) * 100 / (MAX - MIN), 2)
+df_t[sen_lst] = df_t[sen_lst].applymap(func_n)
+
+df_t.loc[df_t['category'] == '원인불명', 'category'] = '경제_가정불화'
+df_t['category'].value_counts()
+df_t.to_excel(fname_result2, index=False)
+
+df_mean = df_t.groupby('category').mean()[col_lst].round(2)
+
+plt.rc('figure', figsize=(12, 6))
+df_mean.T.plot(kind='bar', rot=30)
+plt.grid(True, alpha=0.6, zorder=0)
+plt.title('Sentiment score')
+plt.show()
+
+plt.rc('figure', figsize=(12, 3))
+for cat_st in cat_lst:
+    plt.title(cat_st)
+    df_mean.loc[cat_st].sort_values(ascending=False).plot(kind='bar', rot=30)
+    plt.ylim(0,110)
+    plt.show()
