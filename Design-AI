@@ -295,3 +295,25 @@ plt.grid(True, alpha=0.4, zorder=0)
 plt.title("빈도수분석_디자인 영역별_비율화")
 plt.legend(loc='upper left')
 plt.show()
+
+
+
+num_rows_crawled_graphic = len(df_crawled_graphic_k)
+num_rows_crawled_industry = len(df_crawled_industry_k)
+num_rows_crawled_ux = len(df_crawled_ux_k)
+num_rows_crawled_fashion = len(df_crawled_fashion_k)
+
+df_total_standard_graphic = df_total_graphic.apply(lambda x: x/num_rows_crawled_graphic)
+df_total_standard_industry = df_total_industry.apply(lambda x: x/num_rows_crawled_industry)
+df_total_standard_fashion = df_total_fashion.apply(lambda x: x/num_rows_crawled_fashion)
+df_total_standard_ux = df_total_ux.apply(lambda x: x/num_rows_crawled_ux)
+
+total_standard = pd.concat([df_total_standard_graphic, df_total_standard_industry, df_total_standard_ux, df_total_standard_fashion], join='outer', axis=0, ignore_index=True)
+total_standard.index = ['Graphic', 'Industry', 'UX', 'Fashion']
+total_standard_2 = (total_standard * 1000000).round(0).astype(int)
+total_standard_2
+
+total_standard_2.plot(kind='bar', rot=0)
+plt.grid(True, alpha=0.4, zorder=0)
+plt.legend(loc='best')
+plt.show()
